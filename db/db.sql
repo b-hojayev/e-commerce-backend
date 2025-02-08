@@ -1,0 +1,8 @@
+CREATE DATABASE e_commerce;
+
+CREATE TABLE users (
+    id BIGSERIAL NOT NULL PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    phone_number VARCHAR(12) NOT NULL UNIQUE
+);
