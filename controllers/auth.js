@@ -35,14 +35,14 @@ const register = async (req, res) => {
   const user = response.rows[0];
 
   const accessToken = jwt.sign(
-    { id: user.id },
+    { userId: user.id },
     process.env.JWT_ACCESS_TOKEN_SECRET,
     {
       expiresIn: "1h",
     }
   );
   const refreshToken = jwt.sign(
-    { id: user.id },
+    { userId: user.id },
     process.env.JWT_REFRESH_TOKEN_SECRET,
     { expiresIn: "15d" }
   );
@@ -78,14 +78,14 @@ const login = async (req, res) => {
   }
 
   const accessToken = jwt.sign(
-    { id: user.id },
+    { userId: user.id },
     process.env.JWT_ACCESS_TOKEN_SECRET,
     {
       expiresIn: "1h",
     }
   );
   const refreshToken = jwt.sign(
-    { id: user.id },
+    { userId: user.id },
     process.env.JWT_REFRESH_TOKEN_SECRET,
     { expiresIn: "15d" }
   );
@@ -100,4 +100,45 @@ const login = async (req, res) => {
   return res.status(StatusCodes.OK).json({ accessToken });
 };
 
-module.exports = { register, login };
+const refresh = async (req, res) => {
+  const refreshToken = req.cookies.jwt;
+
+  if (!refreshToken) {
+    throw new UnauthorizedError("Refresh token is missing");
+  }
+
+  try {
+    const payload = jwt.verify(
+      refreshToken,
+      process.env.JWT_REFRESH_TOKEN_SECRET
+    );
+
+    const accessToken = jwt.sign(
+      { userId: payload.userId },
+      process.env.JWT_ACCESS_TOKEN_SECRET,
+      {
+        expiresIn: "1h",
+      }
+    );
+    const newRefreshToken = jwt.sign(
+      { userId: payload.userId },
+      process.env.JWT_REFRESH_TOKEN_SECRET,
+      { expiresIn: "15d" }
+    );
+
+    res.cookie("jwt", newRefreshToken, {
+      httpOnly: true,
+      sameSite: "None",
+      secure: true,
+      maxAge: fifteenDaysInMs,
+    });
+
+    return res.status(200).json({ accessToken });
+  } catch (error) {
+    console.log(error);
+
+    throw new UnauthorizedError("Refresh token is invalid");
+  }
+};
+
+module.exports = { register, login, refresh };
