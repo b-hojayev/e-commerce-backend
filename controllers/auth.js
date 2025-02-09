@@ -1,4 +1,4 @@
-const BadRequestError = require("../errors/bad-request");
+const { BadRequestError, UnauthorizedError } = require("../errors/");
 const db = require("../db/index");
 const jwt = require("jsonwebtoken");
 const { StatusCodes } = require("http-status-codes");
@@ -18,7 +18,9 @@ const register = async (req, res) => {
 
   if (
     first_name.length < 3 ||
+    first_name.length > 50 ||
     last_name.length < 3 ||
+    last_name.length > 50 ||
     !validatePhoneNumber(phone)
   ) {
     throw new BadRequestError(
@@ -42,7 +44,7 @@ const register = async (req, res) => {
   const refreshToken = jwt.sign(
     { id: user.id },
     process.env.JWT_REFRESH_TOKEN_SECRET,
-    { expiresIn: "10d" }
+    { expiresIn: "15d" }
   );
 
   res.cookie("jwt", refreshToken, {
@@ -56,7 +58,46 @@ const register = async (req, res) => {
 };
 
 const login = async (req, res) => {
-  res.status(200).send("login");
+  const { phone } = req.body;
+
+  if (!phone) {
+    throw new BadRequestError("Phone must be provided");
+  }
+
+  if (!validatePhoneNumber(phone)) {
+    throw new BadRequestError("Phone is not passed validation");
+  }
+
+  const result = await db("SELECT * FROM users WHERE phone_number = $1", [
+    phone,
+  ]);
+  const user = result.rows[0];
+
+  if (!user) {
+    throw new UnauthorizedError("User is not registered yet");
+  }
+
+  const accessToken = jwt.sign(
+    { id: user.id },
+    process.env.JWT_ACCESS_TOKEN_SECRET,
+    {
+      expiresIn: "1h",
+    }
+  );
+  const refreshToken = jwt.sign(
+    { id: user.id },
+    process.env.JWT_REFRESH_TOKEN_SECRET,
+    { expiresIn: "15d" }
+  );
+
+  res.cookie("jwt", refreshToken, {
+    httpOnly: true,
+    sameSite: "None",
+    secure: true,
+    maxAge: fifteenDaysInMs,
+  });
+
+  return res.status(StatusCodes.OK).json({ accessToken });
 };
 
 module.exports = { register, login };
