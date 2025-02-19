@@ -1,0 +1,7 @@
+CREATE TABLE product (
+    id BIGSERIAL NOT NULL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    price NUMERIC(10,2) NOT NULL,
+    rating NUMERIC(2,1) NOT NULL,
+    brand_id BIGINT NOT NULL REFERENCES brand(id)
+);

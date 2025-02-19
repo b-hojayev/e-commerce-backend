@@ -1,7 +1,12 @@
-const { BadRequestError, UnauthorizedError } = require("../errors/");
+const {
+  BadRequestError,
+  UnauthorizedError,
+  NotFoundError,
+} = require("../errors/");
 const { StatusCodes } = require("http-status-codes");
 const db = require("../db/index");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 
 const setRefreshToCookie = (response, refreshToken) => {
   return response.cookie("jwt", refreshToken, {
@@ -18,34 +23,38 @@ const generateToken = (userId, key, expiresIn) => {
   });
 };
 
-const validatePhoneNumber = (phone) => {
-  const regex = /^993(61|62|63|64|65|71)\d{6}$/;
-  return regex.test(phone);
-};
+function isValidEmail(email) {
+  const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63}$/;
+  return regex.test(email);
+}
+
 const fifteenDaysInMs = 15 * 24 * 60 * 60 * 1000;
 
 const register = async (req, res) => {
-  const { first_name, last_name, phone } = req.body;
+  const { name, password, email } = req.body;
 
-  if (!first_name || !last_name || !phone) {
-    throw new BadRequestError(`first_name, last_name or phone is empty`);
+  if (!name || !password || !email) {
+    throw new BadRequestError(`name, password or email is empty`);
   }
 
-  if (
-    first_name.length < 3 ||
-    first_name.length > 50 ||
-    last_name.length < 3 ||
-    last_name.length > 50 ||
-    !validatePhoneNumber(phone)
-  ) {
-    throw new BadRequestError(
-      `first_name, last_name or phone is not passed validation`
-    );
+  if (name.length < 3 || name.length > 50) {
+    throw new BadRequestError(`name is not passed validation`);
   }
+
+  if (password.length < 6 || password.length > 50) {
+    throw new BadRequestError("password is not passed validation");
+  }
+
+  if (!isValidEmail(email)) {
+    throw new BadRequestError("email invalid");
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  const hash = await bcrypt.hash(password, salt);
 
   const response = await db(
-    "INSERT INTO users(first_name, last_name, phone_number) VALUES($1, $2, $3) RETURNING *",
-    [first_name, last_name, phone]
+    "INSERT INTO users (name, password, email) VALUES($1, $2, $3) RETURNING *",
+    [name, hash, email]
   );
   const user = response.rows[0];
 
@@ -66,23 +75,31 @@ const register = async (req, res) => {
 };
 
 const login = async (req, res) => {
-  const { phone } = req.body;
+  const { email, password } = req.body;
 
-  if (!phone) {
-    throw new BadRequestError("Phone must be provided");
+  if (!email || !password) {
+    throw new BadRequestError("email and password must be provided");
   }
 
-  if (!validatePhoneNumber(phone)) {
-    throw new BadRequestError("Phone is not passed validation");
+  if (!isValidEmail(email)) {
+    throw new BadRequestError("email invalid");
   }
 
-  const result = await db("SELECT * FROM users WHERE phone_number = $1", [
-    phone,
-  ]);
+  if (password.length < 6 || password.length > 50) {
+    throw new BadRequestError("password is not passed validation");
+  }
+
+  const result = await db("SELECT * FROM users WHERE email = $1", [email]);
   const user = result.rows[0];
 
   if (!user) {
-    throw new UnauthorizedError("User is not registered yet");
+    throw new NotFoundError("user is not found");
+  }
+
+  const isPasswordCorrect = await bcrypt.compare(password, user.password);
+
+  if (!isPasswordCorrect) {
+    throw new UnauthorizedError("invalid credentials");
   }
 
   const accessToken = generateToken(

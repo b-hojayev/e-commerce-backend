@@ -1,0 +1,5 @@
+CREATE TABLE filter_item (
+    id BIGSERIAL NOT NULL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    filter_id BIGINT NOT NULL REFERENCES filter(id)
+);

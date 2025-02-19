@@ -1,0 +1,5 @@
+CREATE TABLE tag (
+    id BIGSERIAL NOT NULL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    category_id BIGINT NOT NULL REFERENCES category(id)
+);
