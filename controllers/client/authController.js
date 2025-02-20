@@ -2,9 +2,9 @@ const {
   BadRequestError,
   UnauthorizedError,
   NotFoundError,
-} = require("../errors/");
+} = require("../../errors/index");
 const { StatusCodes } = require("http-status-codes");
-const db = require("../db/index");
+const db = require("../../db/index");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
